@@ -28,7 +28,10 @@ auto-block). Notifications are log-only/dry-run for now.
     auto-block is enabled, rebuilds and pushes a new collector config via the opamp-server API —
     same mechanism as the manual Quick Action buttons
   - persists policies + audit log in SQLite (`control-plane-data` volume)
-- Traces are exported from the collector to your real Splunk O11y org via the `signalfx` exporter.
+- Traces are exported from the collector to your real Splunk O11y org via the `otlphttp` exporter,
+  pointed at Splunk's OTLP trace ingest endpoint. (Not the `signalfx` exporter: its trace path
+  silently drops all spans in otelcol-contrib v0.158.0 with no errors logged, even at debug level
+  — confirmed via live testing. `otlphttp` works correctly.)
 
 ## Setup
 

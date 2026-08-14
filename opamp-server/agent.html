@@ -121,9 +121,10 @@ connectors:
     metrics_flush_interval: 15s`;
 
 const EXPORTERS_BLOCK = `exporters:
-  signalfx:
-    access_token: \${env:SPLUNK_ACCESS_TOKEN}
-    realm: \${env:SPLUNK_REALM}
+  otlphttp/splunk:
+    traces_endpoint: https://ingest.\${env:SPLUNK_REALM}.signalfx.com/v2/trace/otlp
+    headers:
+      X-SF-Token: \${env:SPLUNK_ACCESS_TOKEN}
   debug:
     verbosity: normal
   prometheus:
@@ -142,7 +143,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [signalfx, debug, spanmetrics]
+      exporters: [otlphttp/splunk, debug, spanmetrics]
 ${METRICS_PIPELINE_BLOCK}
 `;
 
@@ -160,7 +161,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [filter/block_service, batch]
-      exporters: [signalfx, debug, spanmetrics]
+      exporters: [otlphttp/splunk, debug, spanmetrics]
 ${METRICS_PIPELINE_BLOCK}
 `;
 }
@@ -179,7 +180,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [filter/block_environment, batch]
-      exporters: [signalfx, debug, spanmetrics]
+      exporters: [otlphttp/splunk, debug, spanmetrics]
 ${METRICS_PIPELINE_BLOCK}
 `;
 }

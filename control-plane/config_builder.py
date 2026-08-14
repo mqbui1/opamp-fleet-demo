@@ -4,6 +4,11 @@ Kept intentionally simple/string-based (not a YAML library round-trip) so the
 generated config is easy to eyeball during a demo. Mirrors the config built
 client-side in opamp-server/agent.html's quick-action buttons, but supports
 blocking an arbitrary set of (service, environment) pairs at once.
+
+Uses the otlphttp exporter (not the signalfx exporter) to send traces to
+Splunk O11y: the signalfx exporter's trace path silently drops all spans in
+otelcol-contrib v0.158.0 (no errors logged even at debug level) - confirmed
+via live testing. otlphttp against Splunk's OTLP trace ingest endpoint works.
 """
 
 RECEIVERS_CONNECTORS = """receivers:
@@ -23,9 +28,10 @@ connectors:
 """
 
 EXPORTERS = """exporters:
-  signalfx:
-    access_token: ${env:SPLUNK_ACCESS_TOKEN}
-    realm: ${env:SPLUNK_REALM}
+  otlphttp/splunk:
+    traces_endpoint: https://ingest.${env:SPLUNK_REALM}.signalfx.com/v2/trace/otlp
+    headers:
+      X-SF-Token: ${env:SPLUNK_ACCESS_TOKEN}
   debug:
     verbosity: normal
   prometheus:
@@ -52,7 +58,7 @@ def build_config(blocked_pairs: list[tuple[str, str]]) -> str:
     traces:
       receivers: [otlp]
       processors: [{', '.join(trace_processors)}]
-      exporters: [signalfx, debug, spanmetrics]
+      exporters: [otlphttp/splunk, debug, spanmetrics]
     metrics:
       receivers: [spanmetrics]
       exporters: [prometheus]
