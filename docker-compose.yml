@@ -21,3 +21,21 @@ services:
       - otel-collector
     environment:
       - OTLP_ENDPOINT=http://otel-collector:4317
+
+  control-plane:
+    build: ./control-plane
+    depends_on:
+      - opamp-server
+      - otel-collector
+    environment:
+      - OPAMP_SERVER_URL=http://opamp-server:4321
+      - METRICS_URL=http://otel-collector:8889/metrics
+      - DB_PATH=/data/control_plane.db
+      - POLL_INTERVAL_SECONDS=15
+    ports:
+      - "8080:8080"
+    volumes:
+      - control-plane-data:/data
+
+volumes:
+  control-plane-data:

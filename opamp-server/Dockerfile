@@ -1,8 +1,10 @@
-FROM golang:1.23-bookworm AS build
+FROM golang:1.25-bookworm AS build
 WORKDIR /src
 RUN git clone --depth 1 https://github.com/open-telemetry/opamp-go.git .
 COPY agent.html internal/examples/html/html/agent.html
-RUN go build -o /opamp-server ./internal/examples/server
+COPY ui.go internal/examples/server/uisrv/ui.go
+WORKDIR /src/internal/examples
+RUN go build -o /opamp-server ./server
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*

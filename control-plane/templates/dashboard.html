@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fleet Ingest Control Plane</title>
+  <style>
+    body { font-family: -apple-system, Arial, sans-serif; margin: 24px; color: #222; }
+    h1 { margin-bottom: 4px; }
+    .subtitle { color: #666; margin-bottom: 24px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 32px; }
+    th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 14px; vertical-align: middle; }
+    th { background: #f4f4f4; }
+    .status-OK { color: #1a7f37; font-weight: bold; }
+    .status-WARNING { color: #b35900; font-weight: bold; }
+    .status-BLOCKED { color: #b00020; font-weight: bold; }
+    form.inline { display: inline; white-space: nowrap; }
+    input[type=text], input[type=number] { width: 80px; }
+    input[type=email] { width: 150px; }
+    button { cursor: pointer; padding: 4px 10px; margin: 2px; border-radius: 3px; border: none; }
+    .block-btn { background: #b00020; color: white; }
+    .unblock-btn { background: #1a7f37; color: white; }
+    .save-btn { background: #444; color: white; }
+    .audit { font-size: 13px; color: #444; }
+    .audit td { padding: 4px 8px; }
+    label { margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Fleet Ingest Control Plane</h1>
+  <div class="subtitle">
+    Utilization, caps, and ingestion controls per service/environment &mdash; enforced by
+    pushing OTel Collector config over OpAMP. Notifications are log-only/dry-run.
+  </div>
+
+  <table>
+    <tr>
+      <th>Service</th>
+      <th>Environment</th>
+      <th>Rate (spans/min)</th>
+      <th>Cap / Notify / Auto-block / Target</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.service }}</td>
+      <td>{{ row.environment }}</td>
+      <td>{{ "%.1f"|format(row.rate) }}</td>
+      <td>
+        <form class="inline" method="post" action="/policy/update">
+          <input type="hidden" name="service" value="{{ row.service }}">
+          <input type="hidden" name="environment" value="{{ row.environment }}">
+          <input type="number" step="0.1" name="cap_per_min" value="{{ row.cap if row.cap is not none else '' }}" placeholder="no cap">
+          <label><input type="checkbox" name="notify_enabled" {% if row.notify_enabled %}checked{% endif %}>notify</label>
+          <label><input type="checkbox" name="auto_block_enabled" {% if row.auto_block_enabled %}checked{% endif %}>auto-block</label>
+          <input type="email" name="notify_target" value="{{ row.notify_target }}" placeholder="team@example.com">
+          <button class="save-btn" type="submit">Save</button>
+        </form>
+      </td>
+      <td class="status-{{ row.status }}">{{ row.status }}</td>
+      <td>
+        {% if row.blocked %}
+        <form class="inline" method="post" action="/policy/unblock">
+          <input type="hidden" name="service" value="{{ row.service }}">
+          <input type="hidden" name="environment" value="{{ row.environment }}">
+          <button class="unblock-btn" type="submit">Unblock</button>
+        </form>
+        {% else %}
+        <form class="inline" method="post" action="/policy/block">
+          <input type="hidden" name="service" value="{{ row.service }}">
+          <input type="hidden" name="environment" value="{{ row.environment }}">
+          <button class="block-btn" type="submit">Block</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No services discovered yet. Push the base config to the collector (opamp-server UI) and wait for the next scrape interval.</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>Audit Log</h2>
+  <table class="audit">
+    <tr><th>Time</th><th>Service</th><th>Environment</th><th>Action</th><th>Detail</th></tr>
+    {% for a in audit %}
+    <tr>
+      <td>{{ a.ts | int }}</td>
+      <td>{{ a.service }}</td>
+      <td>{{ a.environment }}</td>
+      <td>{{ a.action }}</td>
+      <td>{{ a.detail }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <p><a href="/">Refresh</a></p>
+</body>
+</html>

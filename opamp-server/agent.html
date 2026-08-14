@@ -105,20 +105,35 @@
 </div>
 
 <script>
-const EXPORTERS_BLOCK = `exporters:
-  sapm:
-    access_token: \${env:SPLUNK_ACCESS_TOKEN}
-    endpoint: https://ingest.\${env:SPLUNK_REALM}.signalfx.com/v2/trace
-  debug:
-    verbosity: normal`;
-
-const BASE_CONFIG = `receivers:
+const RECEIVERS_CONNECTORS_BLOCK = `receivers:
   otlp:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+connectors:
+  spanmetrics:
+    dimensions:
+      - name: deployment.environment
+    histogram:
+      disable: true
+    metrics_flush_interval: 15s`;
+
+const EXPORTERS_BLOCK = `exporters:
+  signalfx:
+    access_token: \${env:SPLUNK_ACCESS_TOKEN}
+    realm: \${env:SPLUNK_REALM}
+  debug:
+    verbosity: normal
+  prometheus:
+    endpoint: 0.0.0.0:8889`;
+
+const METRICS_PIPELINE_BLOCK = `    metrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]`;
+
+const BASE_CONFIG = `${RECEIVERS_CONNECTORS_BLOCK}
 processors:
   batch:
 ${EXPORTERS_BLOCK}
@@ -127,17 +142,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [sapm, debug]
+      exporters: [signalfx, debug, spanmetrics]
+${METRICS_PIPELINE_BLOCK}
 `;
 
 function blockService(serviceName) {
-    return `receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
+    return `${RECEIVERS_CONNECTORS_BLOCK}
 processors:
   batch:
   filter/block_service:
@@ -150,18 +160,13 @@ service:
     traces:
       receivers: [otlp]
       processors: [filter/block_service, batch]
-      exporters: [sapm, debug]
+      exporters: [signalfx, debug, spanmetrics]
+${METRICS_PIPELINE_BLOCK}
 `;
 }
 
 function blockEnvironment(envName) {
-    return `receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
+    return `${RECEIVERS_CONNECTORS_BLOCK}
 processors:
   batch:
   filter/block_environment:
@@ -174,7 +179,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [filter/block_environment, batch]
-      exporters: [sapm, debug]
+      exporters: [signalfx, debug, spanmetrics]
+${METRICS_PIPELINE_BLOCK}
 `;
 }
 
