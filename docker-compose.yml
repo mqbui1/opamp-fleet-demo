@@ -1,0 +1,23 @@
+services:
+  opamp-server:
+    build: ./opamp-server
+    ports:
+      - "4320:4320"   # OpAMP protocol endpoint (ws://)
+      - "4321:4321"   # Admin UI
+
+  otel-collector:
+    build: ./collector
+    depends_on:
+      - opamp-server
+    env_file:
+      - .env
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  trace-generator:
+    build: ./generator
+    depends_on:
+      - otel-collector
+    environment:
+      - OTLP_ENDPOINT=http://otel-collector:4317

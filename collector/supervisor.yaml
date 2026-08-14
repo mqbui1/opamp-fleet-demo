@@ -1,0 +1,17 @@
+server:
+  endpoint: ws://opamp-server:4320/v1/opamp
+
+capabilities:
+  reports_effective_config: true
+  reports_own_metrics: false
+  reports_own_logs: false
+  reports_own_traces: false
+  reports_health: true
+  accepts_remote_config: true
+  reports_remote_config: true
+
+agent:
+  executable: /usr/local/bin/otelcol-contrib
+
+storage:
+  directory: /etc/otel/supervisor-data
