@@ -93,103 +93,10 @@
 
 <hr/>
 
-<h3>Fleet Management Quick Actions</h3>
-<div class="quick-actions">
-    <p>These buttons push a full OTel Collector config to this agent over OpAMP, the same way the
-    "Additional Configuration" form below does &mdash; they just pre-fill it for the demo.</p>
-    <button onclick="pushConfig(BASE_CONFIG)">Push Base Config (unblocked)</button>
-    <button onclick="pushConfig(blockService('checkout'))">Block Service: checkout</button>
-    <button onclick="pushConfig(blockService('payments'))">Block Service: payments</button>
-    <button onclick="pushConfig(blockEnvironment('staging'))">Block Environment: staging</button>
-    <button onclick="pushConfig(blockEnvironment('prod'))">Block Environment: prod</button>
-</div>
-
-<script>
-const RECEIVERS_CONNECTORS_BLOCK = `receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
-connectors:
-  spanmetrics:
-    dimensions:
-      - name: deployment.environment
-    histogram:
-      disable: true
-    metrics_flush_interval: 15s`;
-
-const EXPORTERS_BLOCK = `exporters:
-  otlphttp/splunk:
-    traces_endpoint: https://ingest.\${env:SPLUNK_REALM}.signalfx.com/v2/trace/otlp
-    headers:
-      X-SF-Token: \${env:SPLUNK_ACCESS_TOKEN}
-  debug:
-    verbosity: normal
-  prometheus:
-    endpoint: 0.0.0.0:8889`;
-
-const METRICS_PIPELINE_BLOCK = `    metrics:
-      receivers: [spanmetrics]
-      exporters: [prometheus]`;
-
-const BASE_CONFIG = `${RECEIVERS_CONNECTORS_BLOCK}
-processors:
-  batch:
-${EXPORTERS_BLOCK}
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlphttp/splunk, debug, spanmetrics]
-${METRICS_PIPELINE_BLOCK}
-`;
-
-function blockService(serviceName) {
-    return `${RECEIVERS_CONNECTORS_BLOCK}
-processors:
-  batch:
-  filter/block_service:
-    traces:
-      span:
-        - 'resource.attributes["service.name"] == "${serviceName}"'
-${EXPORTERS_BLOCK}
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [filter/block_service, batch]
-      exporters: [otlphttp/splunk, debug, spanmetrics]
-${METRICS_PIPELINE_BLOCK}
-`;
-}
-
-function blockEnvironment(envName) {
-    return `${RECEIVERS_CONNECTORS_BLOCK}
-processors:
-  batch:
-  filter/block_environment:
-    traces:
-      span:
-        - 'resource.attributes["deployment.environment"] == "${envName}"'
-${EXPORTERS_BLOCK}
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [filter/block_environment, batch]
-      exporters: [otlphttp/splunk, debug, spanmetrics]
-${METRICS_PIPELINE_BLOCK}
-`;
-}
-
-function pushConfig(yamlStr) {
-    document.querySelector('textarea[name="config"]').value = yamlStr;
-    document.querySelector('form[action="/save_config"]').submit();
-}
-</script>
+<p><em>Service/environment blocking is managed by the
+<a href="http://localhost:8080">Fleet Ingest Control Plane</a> — use that dashboard instead of
+editing config here directly, to avoid two tools fighting over this agent's config. The manual
+"Additional Configuration" form below is still available for raw OpAMP protocol debugging.</em></p>
 
 <h3>Configuration</h3>
 <table class="config-table">

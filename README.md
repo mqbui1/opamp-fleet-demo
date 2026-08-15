@@ -12,8 +12,11 @@ auto-block). Notifications are log-only/dry-run for now.
 ## Architecture
 
 - **opamp-server** — a real, protocol-compliant OpAMP server (OTel's own reference
-  implementation, `open-telemetry/opamp-go`), extended with a small "Quick Actions" panel on
-  the agent page and a `/api/agents` JSON endpoint. Admin UI at http://localhost:4321.
+  implementation, `open-telemetry/opamp-go`), extended with a `/api/agents` JSON endpoint so
+  the control-plane can discover connected agents. Admin UI at http://localhost:4321 — useful
+  for inspecting agent status/effective config and for raw protocol debugging via its manual
+  "Additional Configuration" form, but **blocking should be done via the control-plane**, not
+  here, to avoid two tools racing to push config to the same agent.
 - **otel-collector** — `otelcol-contrib`, managed by the real `opampsupervisor` (from
   `opentelemetry-collector-contrib`). Starts with no config until a config is pushed; the
   supervisor writes whatever config is pushed to disk and restarts the collector. Also runs a
@@ -25,8 +28,7 @@ auto-block). Notifications are log-only/dry-run for now.
     a live spans/min rate per (service, environment)
   - lets you set a cap, and independently toggle notify / auto-block, per (service, environment)
   - on cap breach: logs a dry-run "would email X" line (and records it in the audit log), and if
-    auto-block is enabled, rebuilds and pushes a new collector config via the opamp-server API —
-    same mechanism as the manual Quick Action buttons
+    auto-block is enabled, rebuilds and pushes a new collector config via the opamp-server API
   - persists policies + audit log in SQLite (`control-plane-data` volume)
 - Traces are exported from the collector to your real Splunk O11y org via the `otlphttp` exporter,
   pointed at Splunk's OTLP trace ingest endpoint. (Not the `signalfx` exporter: its trace path
@@ -43,29 +45,17 @@ docker compose up --build
 
 ## Demo script
 
-### Part 1 — raw OpAMP mechanism (opamp-server UI)
+All blocking/unblocking is done from the **Fleet Ingest Control Plane** (http://localhost:8080)
+— it's the single source of truth for which (service, environment) pairs are blocked, and every
+push it makes rebuilds the full desired-state config from its own database, so there's no drift.
 
-1. Open http://localhost:4321, click the connected agent.
-2. Click **"Push Base Config (unblocked)"**. The collector picks up the config over OpAMP and
-   restarts. Traces for both `checkout` and `payments` should now be flowing.
-3. Confirm both services show up in Splunk O11y APM (may take ~30-60s).
-4. Click **"Block Service: payments"**. This pushes a new config containing an OTel `filter`
-   processor that drops spans where `service.name == "payments"`, over the same OpAMP
-   connection — no redeploy, no restart of the demo stack.
-5. Watch Splunk O11y: `payments` traces stop arriving within roughly one polling interval;
-   `checkout` keeps flowing the whole time.
-6. Click **"Block Environment: staging"** to show the same mechanism scoped by
-   `deployment.environment` instead of `service.name`.
-7. Click **"Push Base Config (unblocked)"** again to restore full ingestion.
-
-### Part 2 — Fleet Ingest Control Plane (control-plane UI)
-
-1. Make sure a base (unblocked) config is active (Part 1, steps 1-2) so the collector has a
-   `spanmetrics` pipeline running and there's traffic to measure.
-2. Open http://localhost:8080. After the first `POLL_INTERVAL_SECONDS`, `checkout`/`prod` and
-   `payments`/`staging` rows appear with a live spans/min rate.
-3. Click **Block** on a row — pushes a filter config for just that (service, environment) pair
-   via the opamp-server API; confirm it disappears from Splunk O11y. Click **Unblock** to restore.
+1. `docker compose up --build` and wait for the stack to come up. Open http://localhost:8080.
+   After the first `POLL_INTERVAL_SECONDS`, `checkout`/`prod` and `payments`/`staging` rows
+   appear with a live spans/min rate.
+2. Confirm both services show up in Splunk O11y APM (may take a few minutes to index).
+3. Click **Block** on the `checkout`/`prod` row — pushes a filter config for just that pair via
+   the opamp-server API; confirm it disappears from Splunk O11y while `payments` keeps flowing.
+   Click **Unblock** to restore.
 4. Set a low **Cap** on a row (e.g. below its current rate), check **notify**, add a
    **Notify target** email, click **Save**. Within one poll interval, check the Audit Log at the
    bottom of the page for a `notify_dryrun` entry (also logged to the container's stdout) —
@@ -73,6 +63,11 @@ docker compose up --build
 5. Check **auto-block** on the same row and click **Save**. On the next poll interval that finds
    the rate still over cap, the row auto-flips to **BLOCKED** and an `auto_block` audit entry
    appears — no manual click needed.
+
+The opamp-server admin UI (http://localhost:4321) is still useful to inspect an agent's raw
+status/effective config, or for one-off raw OpAMP protocol debugging via its manual
+"Additional Configuration" form — but avoid using it to push blocking config in parallel with
+the control-plane, since neither tool is aware of the other's desired state.
 
 ## Notes
 
