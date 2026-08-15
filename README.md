@@ -30,6 +30,8 @@ auto-block). Notifications are log-only/dry-run for now.
   - on cap breach: logs a dry-run "would email X" line (and records it in the audit log), and if
     auto-block is enabled, rebuilds and pushes a new collector config via the opamp-server API
   - persists policies + audit log in SQLite (`control-plane-data` volume)
+  - displays the exact YAML config currently pushed to the agent, rebuilt live from policy state,
+    at the bottom of the dashboard — useful for showing exactly what OpAMP is enforcing
 - Traces are exported from the collector to your real Splunk O11y org via the `otlphttp` exporter,
   pointed at Splunk's OTLP trace ingest endpoint. (Not the `signalfx` exporter: its trace path
   silently drops all spans in otelcol-contrib v0.158.0 with no errors logged, even at debug level
@@ -75,3 +77,14 @@ the control-plane, since neither tool is aware of the other's desired state.
   hand-builds the OTel `filter` processor config, which is exactly what an admin would need
   to author via a real Fleet Management Template.
 - The OpAMP server/supervisor here are the real upstream OSS implementations, not stubs.
+- **Always use `docker compose up --build`**, not plain `up`, after editing any service's code.
+  A plain `up` keeps running stale container images even when the source files on disk have
+  changed — this caused a real bug during testing where the control-plane kept pushing an old,
+  broken config after a fix had already been made to `config_builder.py` (see git history).
+- Every config push is a **full restart** of the `otelcol-contrib` process (not a hot reload),
+  so there's a brief receiver-down window on every block/unblock/auto-block. In this demo it's
+  imperceptible (measured under 50ms) and absorbed by the trace-generator's SDK-level retry —
+  but this is not a production HA pattern. See
+  [`docs/config-push-restart-behavior.md`](docs/config-push-restart-behavior.md) for the full
+  measured behavior and production implications (no redundancy, larger real configs restart
+  slower, finite client retry budgets).
