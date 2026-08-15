@@ -92,6 +92,13 @@
     {% endfor %}
   </table>
 
+  <h2>Currently Pushed Collector Config</h2>
+  <div class="subtitle">
+    Rebuilt from the policies above on every push (block/unblock/auto-block) — this is exactly
+    what's running on the agent right now via OpAMP.
+  </div>
+  <pre style="background:#f4f4f4; border:1px solid #ddd; padding:12px; overflow:auto; font-size:13px;">{{ pushed_config }}</pre>
+
   <p><a href="/">Refresh</a></p>
 </body>
 </html>

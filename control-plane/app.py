@@ -161,8 +161,10 @@ def dashboard(request: Request):
             "status": _row_status(policy),
         })
     audit = [dict(r) for r in storage.recent_audit(30)]
+    pushed_config = build_config(storage.blocked_pairs())
     return templates.TemplateResponse(
-        "dashboard.html", {"request": request, "rows": rows, "audit": audit}
+        "dashboard.html",
+        {"request": request, "rows": rows, "audit": audit, "pushed_config": pushed_config},
     )
 
 
